@@ -85,7 +85,8 @@ class HpipmInterface {
    */
   hpipm_status solve(const vector_t& x0, std::vector<VectorFunctionLinearApproximation>& dynamics,
                      std::vector<ScalarFunctionQuadraticApproximation>& cost, std::vector<VectorFunctionLinearApproximation>* constraints,
-                     vector_array_t& stateTrajectory, vector_array_t& inputTrajectory, bool verbose = false);
+                     std::vector<VectorFunctionLinearApproximation>* ineqConstraints, vector_array_t& stateTrajectory,
+                     vector_array_t& inputTrajectory, bool verbose = false);
 
   /**
    * Return the Riccati cost-to-go for the previously solved problem.

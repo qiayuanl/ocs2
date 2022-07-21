@@ -47,6 +47,7 @@ Transcription setupIntermediateNode(const OptimalControlProblem& optimalControlP
   auto& cost = transcription.cost;
   auto& constraints = transcription.constraints;
   auto& projection = transcription.constraintsProjection;
+  auto& ineqConstraints = transcription.ineqConstraints;
 
   // Dynamics
   // Discretization returns x_{k+1} = A_{k} * dx_{k} + B_{k} * du_{k} + b_{k}
@@ -79,6 +80,9 @@ Transcription setupIntermediateNode(const OptimalControlProblem& optimalControlP
         changeOfInputVariables(cost, projection.dfdu, projection.dfdx, projection.f);
       }
     }
+    if (!optimalControlProblem.inequalityConstraintPtr->empty())
+      ineqConstraints =
+          optimalControlProblem.inequalityConstraintPtr->getLinearApproximation(t, x, u, *optimalControlProblem.preComputationPtr);
   }
 
   return transcription;

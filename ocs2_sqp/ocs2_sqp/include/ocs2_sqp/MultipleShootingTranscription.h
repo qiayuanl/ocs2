@@ -46,6 +46,7 @@ struct Transcription {
   ScalarFunctionQuadraticApproximation cost;
   VectorFunctionLinearApproximation constraints;
   VectorFunctionLinearApproximation constraintsProjection;
+  VectorFunctionLinearApproximation ineqConstraints;
 };
 
 /**

@@ -50,6 +50,7 @@ OptimalControlProblem::OptimalControlProblem()
       stateEqualityConstraintPtr(new StateConstraintCollection),
       preJumpEqualityConstraintPtr(new StateConstraintCollection),
       finalEqualityConstraintPtr(new StateConstraintCollection),
+      inequalityConstraintPtr(new StateInputConstraintCollection),
       /* Lagrangians */
       equalityLagrangianPtr(new StateInputCostCollection),
       stateEqualityLagrangianPtr(new StateCostCollection),
@@ -82,6 +83,7 @@ OptimalControlProblem::OptimalControlProblem(const OptimalControlProblem& other)
       stateEqualityConstraintPtr(other.stateEqualityConstraintPtr->clone()),
       preJumpEqualityConstraintPtr(other.preJumpEqualityConstraintPtr->clone()),
       finalEqualityConstraintPtr(other.finalEqualityConstraintPtr->clone()),
+      inequalityConstraintPtr(other.inequalityConstraintPtr->clone()),
       /* Lagrangians */
       equalityLagrangianPtr(other.equalityLagrangianPtr->clone()),
       stateEqualityLagrangianPtr(other.stateEqualityLagrangianPtr->clone()),
@@ -129,7 +131,7 @@ void OptimalControlProblem::swap(OptimalControlProblem& other) noexcept {
   stateEqualityConstraintPtr.swap(other.stateEqualityConstraintPtr);
   preJumpEqualityConstraintPtr.swap(other.preJumpEqualityConstraintPtr);
   finalEqualityConstraintPtr.swap(other.finalEqualityConstraintPtr);
-
+  inequalityConstraintPtr.swap(other.inequalityConstraintPtr);
   /* Lagrangians */
   equalityLagrangianPtr.swap(other.equalityLagrangianPtr);
   stateEqualityLagrangianPtr.swap(other.stateEqualityLagrangianPtr);

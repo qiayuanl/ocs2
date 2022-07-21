@@ -249,13 +249,14 @@ MultipleShootingSolver::OcpSubproblemSolution MultipleShootingSolver::getOCPSolu
   auto& deltaUSol = solution.deltaUSol;
   hpipm_status status;
   const bool hasStateInputConstraints = !ocpDefinitions_.front().equalityConstraintPtr->empty();
-  if (hasStateInputConstraints && !settings_.projectStateInputEqualityConstraints) {
-    hpipmInterface_.resize(hpipm_interface::extractSizesFromProblem(dynamics_, cost_, &constraints_));
-    status = hpipmInterface_.solve(delta_x0, dynamics_, cost_, &constraints_, deltaXSol, deltaUSol, settings_.printSolverStatus);
-  } else {  // without constraints, or when using projection, we have an unconstrained QP.
-    hpipmInterface_.resize(hpipm_interface::extractSizesFromProblem(dynamics_, cost_, nullptr));
-    status = hpipmInterface_.solve(delta_x0, dynamics_, cost_, nullptr, deltaXSol, deltaUSol, settings_.printSolverStatus);
-  }
+  //  if (hasStateInputConstraints && !settings_.projectStateInputEqualityConstraints) {
+  hpipmInterface_.resize(hpipm_interface::extractSizesFromProblem(dynamics_, cost_, &constraints_, &ineqConstraints_));
+  status = hpipmInterface_.solve(delta_x0, dynamics_, cost_, &constraints_, &ineqConstraints_, deltaXSol, deltaUSol,
+                                 settings_.printSolverStatus);
+  //  } else {  // without constraints, or when using projection, we have an unconstrained QP.
+  //    hpipmInterface_.resize(hpipm_interface::extractSizesFromProblem(dynamics_, cost_, nullptr));
+  //    status = hpipmInterface_.solve(delta_x0, dynamics_, cost_, nullptr, deltaXSol, deltaUSol, settings_.printSolverStatus);
+  //  }
 
   if (status != hpipm_status::SUCCESS) {
     throw std::runtime_error("[MultipleShootingSolver] Failed to solve QP");
@@ -359,6 +360,7 @@ PerformanceIndex MultipleShootingSolver::setupQuadraticSubproblem(const std::vec
   cost_.resize(N + 1);
   constraints_.resize(N + 1);
   constraintsProjection_.resize(N);
+  ineqConstraints_.resize(N + 1);
 
   std::atomic_int timeIndex{0};
   auto parallelTask = [&](int workerId) {
@@ -388,6 +390,7 @@ PerformanceIndex MultipleShootingSolver::setupQuadraticSubproblem(const std::vec
         cost_[i] = std::move(result.cost);
         constraints_[i] = std::move(result.constraints);
         constraintsProjection_[i] = std::move(result.constraintsProjection);
+        ineqConstraints_[i] = std::move(result.ineqConstraints);
       }
 
       i = timeIndex++;

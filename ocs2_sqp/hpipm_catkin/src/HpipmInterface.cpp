@@ -165,7 +165,8 @@ class HpipmInterface::Impl {
 
   hpipm_status solve(const vector_t& x0, std::vector<VectorFunctionLinearApproximation>& dynamics,
                      std::vector<ScalarFunctionQuadraticApproximation>& cost, std::vector<VectorFunctionLinearApproximation>* constraints,
-                     vector_array_t& stateTrajectory, vector_array_t& inputTrajectory, bool verbose) {
+                     std::vector<VectorFunctionLinearApproximation>* ineqConstraints, vector_array_t& stateTrajectory,
+                     vector_array_t& inputTrajectory, bool verbose) {
     const int N = ocpSize_.numStages;
     verifySizes(x0, dynamics, cost, constraints);
 
@@ -227,39 +228,52 @@ class HpipmInterface::Impl {
     std::vector<scalar_t*> DD(N + 1, nullptr);
     std::vector<scalar_t*> llg(N + 1, nullptr);
     std::vector<scalar_t*> uug(N + 1, nullptr);
-    std::vector<ocs2::vector_t> boundData;  // Declare at this scope to keep the data alive while HPIPM has the pointers
+
+    // Declare at this scope to keep the data alive while HPIPM  has the pointers
+    std::vector<VectorFunctionLinearApproximation> constraintsApprox;
+    std::vector<ocs2::vector_t> upperBound, lowerBound;
+    constraintsApprox.resize(N + 1);
+    upperBound.resize(N + 1);
+    lowerBound.resize(N + 1);
 
     if (constraints != nullptr) {
       auto& constr = *constraints;
-      boundData.resize(N + 1);
+      auto& ineqConstr = *ineqConstraints;
 
-      // k = 0, eliminate initial state
-      // numState[0] = 0 --> No need to specify C[0] here
-      if (constr[0].f.size() > 0) {
-        boundData[0] = -constr[0].f;
-        boundData[0].noalias() -= constr[0].dfdx * x0;
-        llg[0] = boundData[0].data();
-        uug[0] = boundData[0].data();
-        DD[0] = constr[0].dfdu.data();
+      // append linearApproximation of eq constraints and inequality constraints
+      for (int k = 0; k < N + 1; k++) {
+        constraintsApprox[k].setZero(ocpSize_.numIneqConstraints[k], ocpSize_.numStates[k], ocpSize_.numInputs[k]);
+        const long ncEq = constr[k].f.rows();
+        const long ncIneq = ineqConstr[k].f.rows();
+
+        constraintsApprox[k].f.segment(0, ncEq) = constr[k].f;
+        constraintsApprox[k].f.segment(ncEq, ncIneq) = ineqConstr[k].f;
+        constraintsApprox[k].dfdx.middleRows(0, ncEq) = constr[k].dfdx;
+        constraintsApprox[k].dfdx.middleRows(ncEq, ncIneq) = ineqConstr[k].dfdx;
+        constraintsApprox[k].dfdu.middleRows(0, ncEq) = constr[k].dfdu;
+        constraintsApprox[k].dfdu.middleRows(ncEq, ncIneq) = ineqConstr[k].dfdu;
       }
-
-      // k = 1 -> (N-1)
-      for (int k = 1; k < N; k++) {
-        if (constr[k].f.size() > 0) {
-          CC[k] = constr[k].dfdx.data();
-          DD[k] = constr[k].dfdu.data();
-          boundData[k] = -constr[k].f;
-          llg[k] = boundData[k].data();
-          uug[k] = boundData[k].data();
+      // TODO: Proper formulation of unboudedness of constraints?
+      if (constraintsApprox[0].f.size() > 0) {
+        lowerBound[0] = -constraintsApprox[0].f;
+        lowerBound[0].noalias() -= constraintsApprox[0].dfdx * x0;
+        upperBound[0] = lowerBound[0];
+        upperBound[0].segment(constr[0].f.rows(), ineqConstr[0].f.rows()) = 1e5 * vector_t::Ones(ineqConstr[0].f.rows());
+        DD[0] = constraintsApprox[0].dfdu.data();
+      }
+      for (int k = 1; k < N + 1; k++) {
+        if (constraintsApprox[k].f.size() > 0) {
+          lowerBound[k] = -constraintsApprox[k].f;
+          upperBound[k] = -constraintsApprox[k].f;
+          upperBound[k].segment(constr[k].f.rows(), ineqConstr[k].f.rows()) = 1e5 * vector_t::Ones(ineqConstr[k].f.rows());
+          CC[k] = constraintsApprox[k].dfdx.data();
+          if (k != N) DD[k] = constraintsApprox[k].dfdu.data();
         }
       }
 
-      // k = N, no inputs
-      if (constr[N].f.size() > 0) {
-        CC[N] = constr[N].dfdx.data();
-        boundData[N] = -constr[N].f;
-        llg[N] = boundData[N].data();
-        uug[N] = boundData[N].data();
+      for (int k = 0; k < N + 1; k++) {
+        llg[k] = lowerBound[k].data();
+        uug[k] = upperBound[k].data();
       }
     }
 
@@ -533,9 +547,10 @@ void HpipmInterface::resize(OcpSize ocpSize) {
 
 hpipm_status HpipmInterface::solve(const vector_t& x0, std::vector<VectorFunctionLinearApproximation>& dynamics,
                                    std::vector<ScalarFunctionQuadraticApproximation>& cost,
-                                   std::vector<VectorFunctionLinearApproximation>* constraints, vector_array_t& stateTrajectory,
+                                   std::vector<VectorFunctionLinearApproximation>* constraints,
+                                   std::vector<VectorFunctionLinearApproximation>* ineqConstraints, vector_array_t& stateTrajectory,
                                    vector_array_t& inputTrajectory, bool verbose) {
-  return pImpl_->solve(x0, dynamics, cost, constraints, stateTrajectory, inputTrajectory, verbose);
+  return pImpl_->solve(x0, dynamics, cost, constraints, ineqConstraints, stateTrajectory, inputTrajectory, verbose);
 }
 
 std::vector<ScalarFunctionQuadraticApproximation> HpipmInterface::getRiccatiCostToGo(const VectorFunctionLinearApproximation& dynamics0,
